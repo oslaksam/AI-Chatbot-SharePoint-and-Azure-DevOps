@@ -1,0 +1,56 @@
+trigger:
+  - none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: 'AI Chat Secrets'
+
+## Job to create release and add tag
+jobs:
+  ## Job to create release notes file and publish it to the wiki
+  - job: CreateReleaseNotes
+    displayName: Creating release notes
+    steps:
+      # Generates a release notes file using the latest version (v4) of the task
+      - task: XplatGenerateReleaseNotes@4
+        displayName: "Generate release notes"
+        inputs:
+          outputfile: '$(System.DefaultWorkingDirectory)/Release-Notes.md'
+          templateLocation: 'File'
+          templatefile: '.azuredevops/release-notes-template.md'
+          dumpPayloadToConsole: false
+          dumpPayloadToFile: false
+          replaceFile: true
+          getParentsAndChildren: false
+          getAllParents: false
+          getIndirectPullRequests: false
+          stopOnError: true
+          considerPartiallySuccessfulReleases: false
+
+
+      # Print the contents of the release notes file
+      - script: |
+          cat $(System.DefaultWorkingDirectory)/Release-Notes.md
+        displayName: 'Print release notes'
+
+
+      # Publishes the release notes in the project wiki
+      - task: WikiUpdaterTask@2
+        displayName: "Publish to the wiki"
+        inputs:
+          repo: "https://dev.azure.com/org/project/_git/project.wiki" # Ensure the repo URL is correct and follows any new guidelines from version 2 notes.
+          filename: "Release-Notes.md" # Maintaining the filename convention.
+          replaceFile: true # Keeping the original behavior.
+          appendToFile: false # Keeping the original behavior.
+          dataIsFile: true # Indicating that the source of the update is a file.
+          sourceFile: '$(System.DefaultWorkingDirectory)/Release-Notes.md' # Providing the path to the source file correctly.
+          message: "Update from Pipeline" # Custom commit message.
+          gitname: $(Release.RequestedFor) # Using release variable for Git username.
+          gitemail: $(Release.RequestedForEmail) # Using release variable for Git email.
+          useAgentToken: false # Utilizing the agent's OAuth token for authentication.
+          localpath: '$(System.DefaultWorkingDirectory)/repo' # Specifying the local clone path.
+          RetryMode: 'Pull'
+          user: 'template'
+          password: '$(ADO_PAT)'

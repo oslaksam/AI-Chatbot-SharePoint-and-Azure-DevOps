@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'DFDS';
+    src: url('DFDS-Regular.ttf') format('truetype');
+}
+
+* {
+    font-family: 'DFDS', sans-serif; /* Ensure font family consistency */
+}
+

@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-chatbot-chainlit
+  namespace: kubernetes-namespace-template
+  labels:
+    app: ai-chatbot-chainlit
+    version: v${Build.BuildNumber}
+    environment: test
+    owner: owner-template
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ai-chatbot-chainlit
+  template:
+    metadata:
+      labels:
+        app: ai-chatbot-chainlit
+        version: v${Build.BuildNumber}
+        environment: test
+        owner: owner-template
+    spec:
+      containers:
+        - name: chainlit
+          image: 674877602397.dkr.ecr.eu-central-1.amazonaws.com/ai-chatbot-chainlit:${Build.BuildNumber}
+          command: [ "python", "-m", "chainlit", "run", "deployment_prod.py", "-h", "--port", "8080" ]
+          resources:
+            requests:
+              memory: "3000Mi"
+              cpu: "100m"
+            limits:
+              memory: "14Gi"
+              cpu: "3500m"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-backend
+                  key: openai_api_base
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-backend
+                  key: openai_api_key
+            - name: REDIS_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-backend
+                  key: redis_address
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: REDIS_PASSWORD
+              value: ""
+            - name: EMBEDDING_MODEL_NAME
+              value: "text-embedding-ada-002"
+            - name: MODEL_NAME
+              value: "gpt-35-turbo-16k"
+            - name: OPENAI_API_TYPE
+              value: "azure"
+            - name: OPENAI_API_VERSION
+              value: "2023-05-15"
+            - name: NUM_DOCUMENTS_TO_RETRIEVE
+              value: "3"
+            - name: SIMILARITY_THRESHOLD
+              value: "0.7"
+            - name: CHROMA_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-ingestion
+                  key: chroma_host
+            - name: CHROMA_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-ingestion
+                  key: chroma_port
+            - name: CHROMA_COLLECTION
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-ingestion
+                  key: chroma_collection
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: TRANSFORMERS_CACHE
+              value: "/cache/.cache/huggingface/transformers"
+            - name: CHAINLIT_URL
+              value: "https://template.cloud:443"
+            - name: CHAINLIT_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ai-chatbot-backend
+                  key: chainlit_auth_secret
+            - name: OAUTH_AZURE_AD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ai-hackathon-backend
+                  key: oauth_azure_ad_client_id
+            - name: OAUTH_AZURE_AD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ai-hackathon-backend
+                  key: oauth_azure_ad_client_secret
+            - name: OAUTH_AZURE_AD_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ai-hackathon-backend
+                  key: oauth_azure_ad_tenant_id
+            - name: OAUTH_AZURE_AD_ENABLE_SINGLE_TENANT
+              value: "true"
+            - name: ENVIRONMENT
+              value: "prod"
+            - name: TRACELOOP_BASE_URL
+              value: "https://otlp-gateway-prod-eu-west-2.grafana.net/otlp"
+            - name: TRACELOOP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: ai-hackathon-backend
+                  key: traceloop_headers
+            - name: SERPER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-hackathon-backend
+                  key: serper_api_key
+            - name: SERPAPI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-hackathon-backend
+                  key: serpapi_api_key
+          volumeMounts:
+            - name: cache-volume
+              mountPath: /cache
+      volumes:
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: ai-hackathon-cache

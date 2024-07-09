@@ -1,0 +1,171 @@
+services:
+  #  scrape-azure-devops:
+  #    build:
+  #      context: ingestion/azure-devops-scrape
+  #      dockerfile: Dockerfile
+  #    env_file:
+  #      - ingestion/.env
+  #    environment:
+  #      - SKIP_EXECUTION=false # skip if you have already ingested data locally
+  #    volumes:
+  #      - shared-data:/data
+  #
+  #  filter-azure-devops:
+  #    build:
+  #      context: ingestion/azure-devops-filter
+  #      dockerfile: Dockerfile
+  #    volumes:
+  #      - shared-data:/data
+  #    environment:
+  #      - SKIP_EXECUTION=false # skip if you have already ingested data locally
+  #    depends_on:
+  #      - scrape-azure-devops
+  #
+  #  ingest-azure-devops:
+  #    build:
+  #      context: ingestion
+  #      dockerfile: Dockerfile
+  #    volumes:
+  #      - shared-data:/data
+  #    env_file:
+  #      - ingestion/.env
+  #    environment:
+  #      - REDIS_HOST=redis
+  #      - SKIP_EXECUTION=false # skip if you have already ingested data locally
+  #    depends_on:
+  #      - redis
+  #      - filter-azure-devops
+
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=${PERSIST_DIRECTORY:-/chroma/chroma}
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma/
+
+  #  scrape-sharepoint:
+  #    depends_on:
+  #      - mongo
+  #      - chromadb
+  #      - redis
+  #    build:
+  #      context: ingestion/sharepoint-scrape
+  #      dockerfile: Dockerfile
+  #    environment:
+  #      - SCRAPE_FOLDER_PATH=/data/sharepoint
+  #    ports:
+  #      - "10001:80"
+  #    env_file:
+  #      - ingestion/.env
+  #    volumes:
+  #      - shared-data:/data
+
+#  ingest-sharepoint:
+#    depends_on:
+#      - mongo
+#      - chromadb
+#      - redis
+#    #      - scrape-sharepoint
+#    build:
+#      context: ingestion/sharepoint-ingest
+#      dockerfile: Dockerfile
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [ gpu ]
+#    ports:
+#      - "10002:80"
+#    env_file:
+#      - ingestion/.env
+#    volumes:
+#      - model_cache:/root/.cache/huggingface/transformers
+#      - shared-data:/data
+#    environment:
+#      - TRANSFORMERS_CACHE=/root/.cache/huggingface/transformers
+#      - CHROMA_HOST=host.docker.internal
+#      - CHROMA_PORT=8000
+#      - REDIS_HOST=host.docker.internal
+#      - REDIS_PORT=6379
+#      - CHROMA_COLLECTION_FULL_DOCS=sharepoint_full_docs
+#      - CHROMA_COLLECTION_CHUNKS=sharepoint_chunks
+#      - NVIDIA_VISIBLE_DEVICES=all
+#      - IS_PERSISTENT=TRUE
+#      - PERSIST_DIRECTORY=${PERSIST_DIRECTORY:-/chroma/chroma}
+#      - SCRAPE_FOLDER_PATH=/data/sharepoint
+#    command: [ "/app/wait_for_chromadb.sh", "host.docker.internal", "8000", "python", "app.py" ]
+
+  redis:
+    image: redis/redis-stack-server:latest
+    volumes:
+      - redis-data:/data
+    ports:
+      - 6379:6379
+
+  history_db:
+    image: postgres:16.3
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: chainlit
+      POSTGRES_PASSWORD: chainlit
+      POSTGRES_DB: chainlit
+      TZ: Europe/Copenhagen
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+#  chainlit:
+#    build:
+#      context: chainlit
+#      dockerfile: Dockerfile
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [ gpu ]
+#    ports:
+#      - "9000:9000"
+#    env_file:
+#      - chainlit/src/.env
+#    volumes:
+#      - model_cache:/root/.cache/huggingface/transformers
+#    environment:
+#      - CHAINLIT_URL=http://localhost:9000
+#      - CHROMA_HOST=host.docker.internal
+#      - CHROMA_PORT=8000
+#      - REDIS_URL=redis://host.docker.internal:6379
+#      - REDIS_ADDRESS=host.docker.internal
+#      - REDIS_PORT=6379
+#    command: ["python", "-m", "chainlit", "run", "deployment_dev.py", "-h", "--port", "9000"]
+
+volumes:
+  mongo_data:
+    driver: local
+  chroma-data:
+    driver: local
+  model_cache:
+    driver: local
+  redis-data:
+    driver: local
+  shared-data:
+    driver: local
+  db_data:
+    driver: local

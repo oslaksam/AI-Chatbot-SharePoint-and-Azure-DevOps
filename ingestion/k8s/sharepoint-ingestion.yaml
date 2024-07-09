@@ -1,0 +1,125 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sharepoint-ingestion-cron
+  namespace: kubernetes-namespace-template
+  labels:
+    app: sharepoint-ingestion
+    version: v${Build.BuildNumber}
+    environment: test
+    owner: owner-template
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "0 2 * * 6" # Every Saturday at 2:00 AM
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 30
+      backoffLimit: 1 # Retry up to 1 time if the Job fails
+      template:
+        metadata:
+          labels:
+            app: sharepoint-ingestion
+            version: v${Build.BuildNumber}
+            environment: test
+            owner: owner-template
+        spec:
+          terminationGracePeriodSeconds: 30
+          restartPolicy: Never  # Do not restart the Pods once they exit
+          containers:
+            - name: sharepoint-ingestion
+              image: 674877602397.dkr.ecr.eu-central-1.amazonaws.com/ai-chatbot-sharepoint-ingestion:${Build.BuildNumber}
+              volumeMounts:
+                - name: shared-data
+                  mountPath: "/data"
+              env:
+                - name: OPENAI_API_BASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: openai_api_base
+                - name: OPENAI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: openai_api_key
+                - name: REDIS_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: redis_host
+                - name: REDIS_PORT
+                  value: "6379"
+                - name: REDIS_PASSWORD
+                  value: ""
+                - name: CHROMA_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: chroma_host
+                - name: CHROMA_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: chroma_port
+                - name: PERSIST_DIRECTORY
+                  value: "/chroma/chroma"
+                - name: CHROMA_COLLECTION
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: chroma_collection
+                - name: CHROMA_COLLECTION_CHUNKS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: chroma_collection_chunks
+                - name: CHROMA_COLLECTION_FULL_DOCS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: chroma_collection_full_docs
+                - name: MONGO_INITDB_ROOT_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_initdb_root_username
+                - name: MONGO_INITDB_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_initdb_root_password
+                - name: MONGO_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_host
+                - name: MONGO_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_port
+                - name: MONGO_DB_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_db_name
+                - name: MONGO_DOCUMENTS_COLLECTION_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_documents_collection_name
+                - name: MONGO_PAGES_COLLECTION_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-hackathon-ingestion
+                      key: mongo_pages_collection_name
+                - name: SCRAPE_FOLDER_PATH
+                  value: "/data/sharepoint"
+                - name: NVIDIA_VISIBLE_DEVICES
+                  value: "all"
+                - name: TRANSFORMERS_CACHE
+                  value: "/data/.cache/huggingface/transformers"
+          volumes:
+            - name: shared-data
+              persistentVolumeClaim:
+                claimName: shared-data-pvc

@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ado-cleanup-cron
+  namespace: kubernetes-namespace-template
+  labels:
+    app: ado-cleanup
+    version: v${Build.BuildNumber}
+    environment: test
+    owner: owner-template
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "40 0 * * *" # the job is set to run daily at 40 minutes past midnight.
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 30
+      template:
+        metadata:
+          labels:
+            app: ado-cleanup
+            version: v${Build.BuildNumber}
+            environment: test
+            owner: owner-template
+        spec:
+          containers:
+            - name: cleanup
+              image: 674877602397.dkr.ecr.eu-central-1.amazonaws.com/ai-chatbot-ado-cleanup:${Build.BuildNumber}
+              volumeMounts:
+                - name: shared-data
+                  mountPath: "/data"
+              env:
+                - name: SKIP_EXECUTION
+                  value: "false"
+          restartPolicy: OnFailure
+          volumes:
+            - name: shared-data
+              persistentVolumeClaim:
+                claimName: shared-data-pvc

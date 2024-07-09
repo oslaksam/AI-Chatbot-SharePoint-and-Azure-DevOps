@@ -1,0 +1,33 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ai-chatbot-chainlit-dev
+  namespace: kubernetes-namespace-template
+spec:
+  entryPoints: [ ]
+  routes:
+    - kind: Rule
+      match: Host(`template.dev.cloud`)
+      priority: 100
+      services:
+        - kind: Service
+          name: ai-chatbot-chainlit-dev
+          namespace: kubernetes-namespace-template
+          port: 80
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ai-chatbot-chainlit
+  namespace: kubernetes-namespace-template
+spec:
+  entryPoints: [ ]
+  routes:
+    - kind: Rule
+      match: Host(`template.dev.cloud`)
+      priority: 100
+      services:
+        - kind: Service
+          name: ai-chatbot-chainlit
+          namespace: kubernetes-namespace-template
+          port: 80

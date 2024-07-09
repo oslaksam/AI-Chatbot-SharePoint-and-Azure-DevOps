@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ingestion-cron
+  namespace: kubernetes-namespace-template
+  labels:
+    app: ingestion
+    version: v${Build.BuildNumber}
+    environment: test
+    owner: owner-template
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "0 1 * * *" # Every day at 1 AM
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 30
+      backoffLimit: 1 # Retry up to 1 time if the Job fails
+      template:
+        metadata:
+          labels:
+            app: ingestion
+            version: v${Build.BuildNumber}
+            environment: test
+            owner: owner-template
+        spec:
+          terminationGracePeriodSeconds: 30
+          restartPolicy: Never  # Do not restart the Pods once they exit
+          containers:
+            - name: ingestion
+              image: 674877602397.dkr.ecr.eu-central-1.amazonaws.com/ai-chatbot-ingestion:${Build.BuildNumber}
+              volumeMounts:
+                - name: shared-data
+                  mountPath: "/data"
+              env:
+                - name: OPENAI_API_BASE
+                  value: null
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: openai_api_base
+                - name: OPENAI_API_KEY
+                  value: null
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: openai_api_key
+                - name: REDIS_HOST
+                  value: null
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: redis_host
+                - name: REDIS_PORT
+                  value: "6379"
+                - name: REDIS_PASSWORD
+                  value: ""
+                - name: GITHUB_ACCESS_TOKEN
+                  value: null
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: github_access_token
+                - name: ORGANIZATION_NAME
+                  value: null
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: github_org_name
+                - name: SKIP_EXECUTION
+                  value: "false"
+          volumes:
+            - name: shared-data
+              persistentVolumeClaim:
+                claimName: shared-data-pvc

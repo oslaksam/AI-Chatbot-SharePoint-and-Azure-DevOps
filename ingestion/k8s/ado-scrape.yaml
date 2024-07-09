@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ado-scrape-cron
+  namespace: kubernetes-namespace-template
+  labels:
+    app: ado-scrape
+    version: v${Build.BuildNumber}
+    environment: test
+    owner: owner-template
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "0 0 * * *" # Every day at midnight
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 30
+      template:
+        metadata:
+          labels:
+            app: ado-scrape
+            version: v${Build.BuildNumber}
+            environment: test
+            owner: owner-template
+        spec:
+          containers:
+            - name: scrape
+              image: 674877602397.dkr.ecr.eu-central-1.amazonaws.com/ai-chatbot-ado-scrape:${Build.BuildNumber}
+              volumeMounts:
+                - name: shared-data
+                  mountPath: "/data"
+              env:
+                - name: ADO_PAT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-chatbot-ingestion
+                      key: ado_pat
+                - name: ORGANIZATION_NAME
+                  value: "TEMPLATE"
+                - name: SKIP_EXECUTION
+                  value: "false"
+          restartPolicy: OnFailure
+          volumes:
+            - name: shared-data
+              persistentVolumeClaim:
+                claimName: shared-data-pvc

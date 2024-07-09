@@ -1,0 +1,311 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - ingestion/*
+      - azure-pipelines-ingestion.yml
+
+resources:
+  - repo: self
+
+variables:
+  - group: 'AI Chat Secrets'
+  - name: tag
+    value: '$(Build.BuildId)'
+  - name: imageName
+    value: 'ai-chatbot-ingestion'
+  - name: awsRegion
+    value: 'eu-central-1'
+
+stages:
+  - stage: CI
+    displayName: Build and push the images to the ECR
+    jobs:
+      - job: CalculateVersion
+        displayName: Tagging release version
+
+        steps:
+          # Checkout with persist credentials
+          - checkout: self
+            persistCredentials: true
+
+          # Unshallow the repository to ensure GitVersion can access the full history
+          - script: |
+              git fetch --unshallow
+            displayName: 'Unshallow Repository'
+
+          # Install GitVersion
+          - task: gitversion/setup@0
+            displayName: Install GitVersion
+            inputs:
+              versionSpec: "5.x"
+
+          # Determine the semantic version
+          - task: gitversion/execute@0
+            displayName: Calculating version
+            inputs:
+              useConfigFile: True
+              configFilePath: "GitVersion.yml"
+
+          # Update Build.BuildNumber to use SemVer, as by default it uses FullSemVer
+          - pwsh: |
+              Write-Host "##vso[build.updatebuildnumber]$(GitVersion.SemVer)"
+            displayName: Update Build.BuildNumber
+
+          # Update the 'tag' variable with the calculated semantic version
+          - pwsh: |
+              echo "##vso[task.setvariable variable=tag;isOutput=true]$(GitVersion.SemVer)"
+            name: setTagVariable
+            displayName: Set Tag Variable
+
+            # Example step showing the updated 'tag' variable usage
+          - script: |
+              echo "New tag value: $(tag)"
+            displayName: Show Updated Tag Value
+
+
+          # Adds the tag for the calculated semantic version
+          - task: PowerShell@2
+            displayName: Adding git release tag
+            name: AddGitTag
+            inputs:
+              targetType: inline
+              script: |
+                Write-Host "Configuring git author info.." -ForegroundColor Cyan
+                git config user.email "Azure DevOps pipeline"
+                git config user.name "Azure.Devops@pipeline.com"
+                
+                # Fetch tags from the remote to ensure we have the latest state
+                git fetch --tags
+                
+                $tag = "v$(GitVersion.SemVer)"
+                
+                Write-Host "Checking if tag $tag already exists in local or remote.." -ForegroundColor Cyan
+                $localTagExists = git tag -l $tag
+                $remoteTagExists = git ls-remote --tags origin refs/tags/$tag
+                
+                if (-not $localTagExists -and -not $remoteTagExists) {
+                  Write-Host "Adding git tag for release $tag.." -ForegroundColor Cyan
+                  git tag -a $tag -m "Release $tag"
+                  git push origin $tag
+                  Write-Host "##vso[task.setvariable variable=generateReleaseNotes;isOutput=true]true"
+                } else {
+                  Write-Host "Tag $tag already exists in local or remote. Skipping tag push.." -ForegroundColor Cyan
+                }
+                
+                Write-Host "Done." -ForegroundColor Cyan
+
+
+      - job: Build
+        displayName: Build and push to the ECR
+        dependsOn: CalculateVersion # This makes the Build job wait for CalculateVersion job to complete
+        pool:
+          vmImage: ubuntu-latest
+        variables:
+          updatedTag: $[ dependencies.CalculateVersion.outputs['setTagVariable.tag'] ]
+        steps:
+          - task: Docker@2
+            displayName: 'Build ado-ingestion Docker image'
+            inputs:
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/ingestion/Dockerfile'
+              arguments: '--tag $(imageName)'
+              addPipelineData: false
+          - task: ECRPushImage@1
+            displayName: 'Push ado-ingestion image to AWS'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              imageSource: 'imagename'
+              sourceImageName: $(imageName)
+              repositoryName: $(imageName)
+              pushTag: $(updatedTag)
+              autoCreateRepository: true
+          - task: AWSShellScript@1
+            displayName: 'Set ado-ingestion repository pull permissions'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              scriptType: inline
+              inlineScript: |
+                aws ecr set-repository-policy \
+                  --repository-name $(imageName) \
+                  --region $(awsRegion) \
+                  --policy-text '{"Version":"2008-10-17","Statement":[{"Sid":"Allow pull","Effect":"Allow","Principal":{"AWS":["arn:aws:iam::738063116313:root","arn:aws:iam::738063116313:role/eks-hellman-node"]},"Action":["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}'
+            continueOnError: false
+
+          - task: Docker@2
+            displayName: 'Build ado-scrape Docker image'
+            inputs:
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/ingestion/azure-devops-scrape/Dockerfile'
+              arguments: '--tag ai-chatbot-ado-scrape'
+              addPipelineData: false
+          - task: ECRPushImage@1
+            displayName: 'Push ado-scrape image to AWS'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              imageSource: 'imagename'
+              sourceImageName: ai-chatbot-ado-scrape
+              repositoryName: ai-chatbot-ado-scrape
+              pushTag: $(updatedTag)
+              autoCreateRepository: true
+          - task: AWSShellScript@1
+            displayName: 'Set ado-scrape repository pull permissions'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              scriptType: inline
+              inlineScript: |
+                aws ecr set-repository-policy \
+                  --repository-name ai-chatbot-ado-scrape \
+                  --region $(awsRegion) \
+                  --policy-text '{"Version":"2008-10-17","Statement":[{"Sid":"Allow pull","Effect":"Allow","Principal":{"AWS":["arn:aws:iam::738063116313:root","arn:aws:iam::738063116313:role/eks-hellman-node"]},"Action":["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}'
+            continueOnError: false
+
+          - task: Docker@2
+            displayName: 'Build ado-cleanup Docker image'
+            inputs:
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/ingestion/azure-devops-filter/Dockerfile'
+              arguments: '--tag ai-hackathon-ado-cleanup'
+              addPipelineData: false
+          - task: ECRPushImage@1
+            displayName: 'Push ado-cleanup image to AWS'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              imageSource: 'imagename'
+              sourceImageName: ai-hackathon-ado-cleanup
+              repositoryName: ai-hackathon-ado-cleanup
+              pushTag: $(updatedTag)
+              autoCreateRepository: true
+          - task: AWSShellScript@1
+            displayName: 'Set ado-cleanup repository pull permissions'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              scriptType: inline
+              inlineScript: |
+                aws ecr set-repository-policy \
+                  --repository-name ai-hackathon-ado-cleanup \
+                  --region $(awsRegion) \
+                  --policy-text '{"Version":"2008-10-17","Statement":[{"Sid":"Allow pull","Effect":"Allow","Principal":{"AWS":["arn:aws:iam::738063116313:root","arn:aws:iam::738063116313:role/eks-hellman-node"]},"Action":["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}'
+            continueOnError: false
+
+          - task: Docker@2
+            displayName: 'Build sharepoint-scrape Docker image'
+            inputs:
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/ingestion/sharepoint-scrape/Dockerfile'
+              arguments: '--tag ai-hackathon-sharepoint-scrape'
+              addPipelineData: false
+          - task: ECRPushImage@1
+            displayName: 'Push sharepoint-scrape image to AWS'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              imageSource: 'imagename'
+              sourceImageName: ai-hackathon-sharepoint-scrape
+              repositoryName: ai-hackathon-sharepoint-scrape
+              pushTag: $(updatedTag)
+              autoCreateRepository: true
+          - task: AWSShellScript@1
+            displayName: 'Set sharepoint-scrape repository pull permissions'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              scriptType: inline
+              inlineScript: |
+                aws ecr set-repository-policy \
+                  --repository-name ai-hackathon-sharepoint-scrape \
+                  --region $(awsRegion) \
+                  --policy-text '{"Version":"2008-10-17","Statement":[{"Sid":"Allow pull","Effect":"Allow","Principal":{"AWS":["arn:aws:iam::738063116313:root","arn:aws:iam::738063116313:role/eks-hellman-node"]},"Action":["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}'
+            continueOnError: false
+            
+          - task: Docker@2
+            displayName: 'Build sharepoint-ingestion Docker image'
+            inputs:
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/ingestion/sharepoint-ingest/Dockerfile'
+              arguments: '--tag ai-hackathon-sharepoint-ingestion'
+              addPipelineData: false
+          - task: ECRPushImage@1
+            displayName: 'Push sharepoint-ingestion image to AWS'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              imageSource: 'imagename'
+              sourceImageName: ai-hackathon-sharepoint-ingestion
+              repositoryName: ai-hackathon-sharepoint-ingestion
+              pushTag: $(updatedTag)
+              autoCreateRepository: true
+          - task: AWSShellScript@1
+            displayName: 'Set sharepoint-ingestion repository pull permissions'
+            inputs:
+              awsCredentials: 'aws-hackathon-capability'
+              regionName: $(awsRegion)
+              scriptType: inline
+              inlineScript: |
+                aws ecr set-repository-policy \
+                  --repository-name ai-hackathon-sharepoint-ingestion \
+                  --region $(awsRegion) \
+                  --policy-text '{"Version":"2008-10-17","Statement":[{"Sid":"Allow pull","Effect":"Allow","Principal":{"AWS":["arn:aws:iam::738063116313:root","arn:aws:iam::738063116313:role/eks-hellman-node"]},"Action":["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"]}]}'
+            continueOnError: false            
+
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Artifact: k8s"
+            inputs:
+              PathtoPublish: "./ingestion/k8s"
+              ArtifactName: k8s
+
+      ## Job to create release notes file and publish it to the wiki
+      - job: CreateReleaseNotes
+        variables:
+          shouldCreateReleaseNotes: $[ dependencies.CalculateVersion.outputs['AddGitTag.generateReleaseNotes'] ]
+        condition: eq(variables['shouldCreateReleaseNotes'], 'true')
+        dependsOn: Build
+        displayName: Creating release notes
+        steps:
+          # Generates a release notes file using the latest version (v4) of the task
+          - task: XplatGenerateReleaseNotes@4
+            displayName: "Generate release notes"
+            inputs:
+              outputfile: '$(System.DefaultWorkingDirectory)/Release-Notes.md'
+              templateLocation: 'File'
+              templatefile: '.azuredevops/release-notes-template.md'
+              dumpPayloadToConsole: false
+              dumpPayloadToFile: false
+              replaceFile: true
+              getParentsAndChildren: false
+              getAllParents: false
+              getIndirectPullRequests: false
+              stopOnError: true
+              considerPartiallySuccessfulReleases: false
+
+          # Publishes the release notes in the project wiki
+          - task: WikiUpdaterTask@2
+            displayName: "Publish to the wiki"
+            inputs:
+              repo: "https://dev.azure.com/template/project/_git/project.wiki" # Ensure the repo URL is correct and follows any new guidelines from version 2 notes.
+              filename: "Release-Notes.md" # Maintaining the filename convention.
+              replaceFile: false # Keeping the original behavior.
+              appendToFile: true # Keeping the original behavior.
+              dataIsFile: true # Indicating that the source of the update is a file.
+              sourceFile: '$(System.DefaultWorkingDirectory)/Release-Notes.md' # Providing the path to the source file correctly.
+              message: "Update from Pipeline" # Custom commit message.
+              gitname: $(Release.RequestedFor) # Using release variable for Git username.
+              gitemail: $(Release.RequestedForEmail) # Using release variable for Git email.
+              useAgentToken: false # Utilizing the agent's OAuth token for authentication.
+              localpath: '$(System.DefaultWorkingDirectory)/repo' # Specifying the local clone path.
+              RetryMode: 'Pull'
+              user: 'template'
+              password: '$(ADO_PAT)'
