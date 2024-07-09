@@ -11,4 +11,4 @@ PyJWT==2.8.0
 pymongo==4.6.1
 python-dotenv==1.0.1
 requests==2.31.0
-urllib3==2.2.1
+urllib3==2.2.2
