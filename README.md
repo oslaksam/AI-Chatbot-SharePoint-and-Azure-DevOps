@@ -7,17 +7,8 @@ We've got the *Ingestion* and *Chainlit* for the backend and frontend.
 ## Demo
 Here are demos of how the chatbot works:
 
-<!-- Replace the GIF with a video -->
-<video style="width: 100%; height: auto;" controls allowfullscreen>
-  <source src="aichatdemowiki2x.mp4" type="video/mp4">
-  ![Demo GIF ADO](aichatdemowiki2x.gif)
-</video>
-
-<!-- You can add more videos similarly -->
-<video style="width: 100%; height: auto;" controls allowfullscreen>
-  <source src="videodemosharepoint.mp4" type="video/mp4">
-  ![Demo GIF SharePoint](videodemosharepoint.gif)
-</video>
+![Demo GIF ADO](aichatdemowiki2x.gif)
+![Demo GIF SharePoint](videodemosharepoint.gif)
 
 ## Architecture Overview
 ![Architecture](architecture.jpg)
