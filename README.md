@@ -1,30 +1,29 @@
-# Arrr, Welcome ye aboard to the private Azure DevOps and SharePoint Internal Wikis ☠️⚓
+# Private GPT-based Chatbot with Azure DevOps and SharePoint Data
 
-Ahoy, me hearties! This be the treasure chest containin' the private Azure GPT instance fer the internal wikis. Navigate yerselves through the stormy seas of vast information with the help of this here private Azure GPT instance!
+Welcome to the repository for the private Azure GPT instance powered chatbot, designed for internal wikis and SharePoint documents.
 
-![Pirate Flag](https://img1.picmix.com/output/stamp/normal/6/3/4/2/922436_b0801.gif)
+We've got the *Ingestion* and *Chainlit* for the backend and frontend.
 
-We've got the Ingestion and Chainlit for the backend and frontend.
+## Demo
+Here are demos of how the chatbot works:
 
-## Table o’ Contents 🗺️
-- [Settin' Sail](#settin-sail)
-- [Ingestion](#ingestion)
-- [Contributin' to the treasure](#contributin-to-the-treasure)
-- [Licence](#licence)
+![Demo GIF ADO](aichatdemowiki2x.gif)
+![Demo GIF SharePoint](videodemosharepoint.gif)
 
-## Architecture🏴‍☠️
+## Architecture Overview
 ![Architecture](architecture.jpg)
 
-## Settin' Sail 🚢
+## Getting Started
 
-To run this here application on yer local ship (computer), ye will be needin' these:
+To set up and run this application on your local machine, ensure you have the following prerequisites:
 
-- A bottle o' [Python](https://www.python.org) (3.11 or newer)
-- A map o' the environment variables (`.env` file)
+- [Python](https://www.python.org) (version 3.11 or newer)
+- An environment variables file (`.env` file) for every `.env.template`
+- Docker Desktop
+- API Keys from 1Password
 
-
-## Running locally 🏴‍☠️
-You need to create an `.env` files based on the structure of env files in `docker-compose.yaml`. You can use `.env.template` as a starting point. 
+## Running Locally
+Create an `.env` file based on the structure provided in the `docker-compose.yaml` file. You can use the `.env.template` as a reference.
 
 Then you can run the whole ingestion part with:
 ```sh
@@ -35,20 +34,18 @@ If you do not want to go through this process you can simply port forward the Re
 
 In order to run the Chainlit app you need to go to the chainlit folder:
 ```sh
-cd chainlit
+cd chainlit/src
 ```
 Once you are there install the dependencies with from requirements.txt with:
 ```sh
 pip install -r requirements.txt
 ```
-Once they are installed to to the src folder:
-```sh
-cd src
-```
-Then you can run the app with:
+Once they are installed run the app with:
 ```sh
 chainlit run deployment_dev.py --port 9000
 ```
+
+Don’t forget to replace `https://github.com/template` with the actual URL to yer GitHub repository and add an image URL to the logo you want. In chainlit config.
 
 ## Ingestion 📜
 Arrr! This be where we plunder the high seas for knowledge! The Ingestion be responsible for gatherin' data from the wikis and feedin' it to private Azure GPT instance’s insatiable belly.
@@ -56,14 +53,8 @@ Arrr! This be where we plunder the high seas for knowledge! The Ingestion be res
 To read more about the ingestion, you can start by reading the [README.md](ingestion/README.md) in the ingestion folder.
 Also consider reading about scraping in [azure-devops-scrape/README.md](ingestion/azure-devops-scrape/README.md) and filtering in [azure-devops-filter/README.md](ingestion/azure-devops-filter/README.md).
 
-
-## Contributin' to the treasure 💰
-Ahoy! Feel free to add to the treasure! Make sure ye be followin’ the code of conduct, and submit yer pull requests. May the wind be ever in yer sails!
-
 ## Licence 📜
-This project be under the MIT License. Pillage and plunder all ye want, but remember to share the spoils!
-
-This be yer README.md in a pirate’s tongue. May yer project sail through calm waters and find the treasure ye be seekin'! Don’t forget to replace `https://github.com/template` with the actual URL to yer GitHub repository and add an image URL to the pirate flag if ye wish. Arrr! ⚓
+This project be under the GNU AFFERO GENERAL PUBLIC LICENSE License. Pillage and plunder all ye want, but remember to share the spoils!
 
 # Azure Pipelines Chainlit Script Documentation
 

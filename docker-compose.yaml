@@ -47,7 +47,7 @@ services:
       - mongo_data:/data/db
 
   chromadb:
-    image: ghcr.io/chroma-core/chroma:latest
+    image: ghcr.io/chroma-core/chroma:0.5.5
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=${PERSIST_DIRECTORY:-/chroma/chroma}

@@ -7,7 +7,7 @@ redis==5.0.1
 tiktoken==0.6.0
 python-dotenv==1.0.1
 chainlit==1.1.202
-chromadb==0.4.24
+chromadb==0.5.5
 sentence_transformers==2.4.0
 torch==2.2.0
 flashrank==0.1.66
@@ -42,6 +42,8 @@ SQLAlchemy==2.0.23
 boto3==1.34.122
 azure-identity==1.16.0
 azure-storage-file-datalake==12.15.0
+nltk==3.9.1
+python-pptx==1.0.2
 # chromadb-data-pipes==0.0.8
 # tqdm
 # numpy
